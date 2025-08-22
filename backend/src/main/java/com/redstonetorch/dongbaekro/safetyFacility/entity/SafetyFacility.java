@@ -1,4 +1,4 @@
-package com.redstonetorch.dongbaekro.safetyFacilities.entity;
+package com.redstonetorch.dongbaekro.safetyFacility.entity;
 
 import java.time.LocalDateTime;
 
@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "safety_facilities")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class SafetyFacilities {
+public class SafetyFacility {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -62,7 +62,7 @@ public class SafetyFacilities {
 	}
 
 	@Builder
-	public SafetyFacilities(SafetyFacilityType type, String name, Double latitude, Double longitude, String address) {
+	public SafetyFacility(SafetyFacilityType type, String name, Double latitude, Double longitude, String address) {
 		this.type = type;
 		this.name = name;
 		this.latitude = latitude;
