@@ -37,6 +37,7 @@ import com.kakao.vectormap.MapLifeCycleCallback
 import com.kakao.vectormap.MapView
 import com.kakao.vectormap.camera.CameraUpdateFactory
 import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelTextBuilder
 import com.redstonetorch.dongbaekro.R
 import com.redstonetorch.dongbaekro.ui.NeighborhoodViewModel
 import com.redstonetorch.dongbaekro.util.CommonUtils
@@ -72,20 +73,52 @@ fun HomeScreen() {
     val scaffoldState = rememberBottomSheetScaffoldState()
     val scope = rememberCoroutineScope()
 
+    // Collect safety facilities from ViewModel
+    val safetyFacilities by viewModel.safetyFacilities.collectAsState()
+    // Collect region code from ViewModel
+    val regionCode by viewModel.regionCode.collectAsState()
+
     LaunchedEffect(locationPermissionState) {
         if (locationPermissionState.status.isGranted) {
             val location = CommonUtils.getXY(context)
             if (location != null) {
                 currentLat = location.first
                 currentLng = location.second
+                // Fetch region code when location is available
+                viewModel.getRegionCode(location.first, location.second)
             }
         } else {
             locationPermissionState.launchPermissionRequest()
         }
     }
 
+    // Observe safetyFacilities and update map markers
+    LaunchedEffect(safetyFacilities) {
+        kakaoMap.value?.let { map ->
+            // Clear all existing labels (pins) except the user's location marker
+            map.labelManager?.layer?.removeAll()
+            currentLat?.let { lat -> currentLng?.let { lng -> setupUserLocationMarker(map, lat, lng) } }
+
+            // Add new labels for safety facilities
+            safetyFacilities.forEach { facility ->
+                val pos = LatLng.from(facility.latitude, facility.longitude)
+                val labelOptions = LabelOptions.from(pos)
+                    .setStyles(getMarkerStyleForType(facility.type))
+                    .setTexts(LabelTextBuilder().setTexts(facility.name))
+
+                map.labelManager?.layer?.addLabel(labelOptions)
+            }
+
+            // Move camera to the first fetched facility if available
+            safetyFacilities.firstOrNull()?.let { firstFacility ->
+                val firstFacilityPos = LatLng.from(firstFacility.latitude, firstFacility.longitude)
+                map.moveCamera(CameraUpdateFactory.newCenterPosition(firstFacilityPos, 15))
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // 원래 구조로 복원 - BottomSheetScaffold가 메인
+        // BottomSheetScaffold가 메인
         BottomSheetScaffold(
             scaffoldState = scaffoldState,
             sheetPeekHeight = 32.dp, // 1. 완전히 내렸을 때 작은 바만 보이도록
@@ -100,8 +133,8 @@ fun HomeScreen() {
                             scaffoldState.bottomSheetState.partialExpand()
                         }
 
-                        // 시설물 핀 표시
-                        showSafetyFacilities(kakaoMap.value, facilityType, currentLat, currentLng)
+                        // Call ViewModel to fetch safety facilities
+                        viewModel.getSafetyFacilities(facilityType)
                     }
                 )
             },
@@ -777,13 +810,13 @@ fun SafetyFacilitiesSection(onSafetyFacilityClick: (String) -> Unit) {
             SafetyFacilityButton(
                 icon = "📦",
                 text = "안심택배함",
-                onClick = { onSafetyFacilityClick("안심택배함") },
+                onClick = { onSafetyFacilityClick("SAFE_DELIVERY_BOX") },
                 modifier = Modifier.weight(1f)
             )
             SafetyFacilityButton(
                 icon = "🏢",
-                text = "지구대",
-                onClick = { onSafetyFacilityClick("지구대") },
+                text = "파출소", // Changed text to 파출소
+                onClick = { onSafetyFacilityClick("POLICE_SUBSTATION") },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -802,8 +835,28 @@ fun SafetyFacilitiesSection(onSafetyFacilityClick: (String) -> Unit) {
             )
             SafetyFacilityButton(
                 icon = "💡",
-                text = "안내판/보안등",
-                onClick = { onSafetyFacilityClick("안내판/보안등") },
+                text = "가로등", // Changed text to 가로등
+                onClick = { onSafetyFacilityClick("STREETLAMP") },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SafetyFacilityButton(
+                icon = "🪧", // Placeholder icon for INFORMATION_BOARD
+                text = "안내판",
+                onClick = { onSafetyFacilityClick("INFORMATION_BOARD") },
+                modifier = Modifier.weight(1f)
+            )
+            SafetyFacilityButton(
+                icon = "🔔", // Placeholder icon for EMERGENCY_BELL
+                text = "비상벨",
+                onClick = { onSafetyFacilityClick("EMERGENCY_BELL") },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -869,83 +922,16 @@ fun moveToMyLocation(map: KakaoMap?, lat: Double, lng: Double) {
     }
 }
 
-// 안심시설물 표시 기능
-fun showSafetyFacilities(map: KakaoMap?, facilityType: String, userLat: Double?, userLng: Double?) {
-    map?.let { kakaoMap ->
-        userLat?.let { lat ->
-            userLng?.let { lng ->
-                // 기존 마커들 제거 (선택사항)
-                kakaoMap.labelManager?.layer?.removeAll()
-
-                // 사용자 위치 마커 다시 추가
-                setupUserLocationMarker(kakaoMap, lat, lng)
-
-                // 선택된 시설물 마커 추가
-                when (facilityType) {
-                    "CCTV" -> showCCTVMarkers(kakaoMap, lat, lng)
-                    "안심택배함" -> showSafeBoxMarkers(kakaoMap, lat, lng)
-                    "지구대" -> showPoliceStationMarkers(kakaoMap, lat, lng)
-                    "안내판/보안등" -> showSecurityLightMarkers(kakaoMap, lat, lng)
-                }
-            }
-        }
+// Helper function to get marker style based on facility type
+fun getMarkerStyleForType(type: String): Int {
+    return when (type) {
+        "CCTV" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        "STREETLAMP" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        "POLICE_SUBSTATION" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        "INFORMATION_BOARD" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        "EMERGENCY_BELL" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        "SAFE_DELIVERY_BOX" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
+        else -> android.R.drawable.ic_menu_mylocation // Default marker
     }
 }
 
-fun showCCTVMarkers(map: KakaoMap, userLat: Double, userLng: Double) {
-    val cctvLocations = listOf(
-        LatLng.from(userLat + 0.001, userLng + 0.001),
-        LatLng.from(userLat - 0.001, userLng - 0.001),
-        LatLng.from(userLat + 0.002, userLng - 0.002)
-    )
-
-    cctvLocations.forEach { pos ->
-        map.labelManager?.layer?.addLabel(
-            LabelOptions.from(pos)
-                .setStyles(R.drawable.outline_search_24)
-        )
-    }
-}
-
-fun showSafeBoxMarkers(map: KakaoMap, userLat: Double, userLng: Double) {
-    val safeBoxLocations = listOf(
-        LatLng.from(userLat + 0.0015, userLng + 0.0015),
-        LatLng.from(userLat - 0.0015, userLng + 0.0015)
-    )
-
-    safeBoxLocations.forEach { pos ->
-        map.labelManager?.layer?.addLabel(
-            LabelOptions.from(pos)
-                .setStyles(R.drawable.outline_add_box_24)
-        )
-    }
-}
-
-fun showPoliceStationMarkers(map: KakaoMap, userLat: Double, userLng: Double) {
-    val policeStations = listOf(
-        LatLng.from(userLat + 0.003, userLng + 0.001),
-        LatLng.from(userLat - 0.002, userLng + 0.003)
-    )
-
-    policeStations.forEach { pos ->
-        map.labelManager?.layer?.addLabel(
-            LabelOptions.from(pos)
-                .setStyles(R.drawable.outline_home_work_24)
-        )
-    }
-}
-
-fun showSecurityLightMarkers(map: KakaoMap, userLat: Double, userLng: Double) {
-    val securityLights = listOf(
-        LatLng.from(userLat + 0.0008, userLng + 0.0012),
-        LatLng.from(userLat - 0.0008, userLng - 0.0005),
-        LatLng.from(userLat + 0.0012, userLng - 0.0008)
-    )
-
-    securityLights.forEach { pos ->
-        map.labelManager?.layer?.addLabel(
-            LabelOptions.from(pos)
-                .setStyles(R.drawable.outline_paid_24)
-        )
-    }
-}

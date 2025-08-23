@@ -10,6 +10,11 @@ import com.redstonetorch.dongbaekro.ui.AuthViewModel
 import com.redstonetorch.dongbaekro.ui.LoginScreen
 import com.redstonetorch.dongbaekro.ui.MainScreen
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.ui.Modifier
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

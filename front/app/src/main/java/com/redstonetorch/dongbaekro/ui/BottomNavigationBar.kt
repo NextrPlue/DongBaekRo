@@ -67,7 +67,21 @@ fun AppNavigation(viewModel: AuthViewModel) {
         NavHost(navController, startDestination = Screen.Home.route, Modifier.padding(innerPadding)) {
             composable(Screen.Home.route) { HomeScreen() }
             composable(Screen.SOS.route) { SOSScreen() }
-            composable(Screen.Settings.route) { SettingsScreen(viewModel = viewModel) }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onLogout = {
+                        // Navigate to the login screen or main entry point after logout
+                        navController.navigate("login") { // Assuming "login" is the route for the login screen
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true // Clear back stack
+                            }
+                        }
+                    }
+                )
+            }
+            // Add login composable for navigation
+            composable("login") { LoginScreen(viewModel = viewModel) } // Assuming LoginScreen takes AuthViewModel
         }
     }
 }
