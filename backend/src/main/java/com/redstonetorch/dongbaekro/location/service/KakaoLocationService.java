@@ -17,17 +17,17 @@ import com.redstonetorch.dongbaekro.location.dto.request.WalkingDirectionsReques
 import com.redstonetorch.dongbaekro.location.dto.request.WalkingWaypointsRequest;
 import com.redstonetorch.dongbaekro.location.dto.response.KakaoRegionResponse;
 
-import lombok.RequiredArgsConstructor;
-
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class KakaoLocationService {
 
 	private final RestTemplate restTemplate;
+	private final String kakaoApiKey;
 
-	@Value("13813d37e731b114145dd1ecb4b8ab59")
-	private String kakaoApiKey;
+	public KakaoLocationService(RestTemplate restTemplate, @Value("${KAKAO_REST_API}") String kakaoApiKey) {
+		this.restTemplate = restTemplate;
+		this.kakaoApiKey = kakaoApiKey;
+	}
 
 	private static final String KAKAO_COORD_TO_REGION_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json";
 	private static final String KAKAO_WALKING_DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/affiliate/walking/v1/directions";
@@ -93,7 +93,7 @@ public class KakaoLocationService {
 			// 디버깅을 위해 먼저 String으로 응답 확인
 			ResponseEntity<String> rawResponse = restTemplate.exchange(
 				url, HttpMethod.GET, entity, String.class);
-			
+
 			log.info("Raw Kakao API Response: {}", rawResponse.getBody());
 
 			ResponseEntity<KakaoWalkingDirectionsResponse> response = restTemplate.exchange(
@@ -108,7 +108,7 @@ public class KakaoLocationService {
 
 	public KakaoWalkingDirectionsResponse getWalkingDirectionsWithWaypoints(WalkingWaypointsRequest request) {
 		try {
-			log.info("Calling Kakao Walking Waypoints API with origin: {}, destination: {}, waypoints: {}", 
+			log.info("Calling Kakao Walking Waypoints API with origin: {}, destination: {}, waypoints: {}",
 				request.origin(), request.destination(), request.waypoints() != null ? request.waypoints().size() : 0);
 			log.info("Request body: {}", request);
 
@@ -125,7 +125,7 @@ public class KakaoLocationService {
 			// 디버깅을 위해 먼저 String으로 응답 확인
 			ResponseEntity<String> rawResponse = restTemplate.exchange(
 				KAKAO_WALKING_WAYPOINTS_URL, HttpMethod.POST, entity, String.class);
-			
+
 			log.info("Raw Kakao Waypoints API Response: {}", rawResponse.getBody());
 
 			ResponseEntity<KakaoWalkingDirectionsResponse> response = restTemplate.exchange(
