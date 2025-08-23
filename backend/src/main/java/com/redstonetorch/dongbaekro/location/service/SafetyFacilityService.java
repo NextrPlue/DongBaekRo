@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.redstonetorch.dongbaekro.common.enums.SafetyFacilityType;
 import com.redstonetorch.dongbaekro.location.dto.response.SafetyFacilityResponse;
 import com.redstonetorch.dongbaekro.location.repository.SafetyFacilityRepository;
 
@@ -19,6 +20,13 @@ public class SafetyFacilityService {
 
 	public List<SafetyFacilityResponse> findByCode(String code) {
 		return safetyFacilityRepository.findByCode(code)
+			.stream()
+			.map(SafetyFacilityResponse::from)
+			.toList();
+	}
+
+	public List<SafetyFacilityResponse> findByCodeAndType(String code, SafetyFacilityType type) {
+		return safetyFacilityRepository.findByCodeAndType(code, type)
 			.stream()
 			.map(SafetyFacilityResponse::from)
 			.toList();
