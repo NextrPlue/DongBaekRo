@@ -1,6 +1,4 @@
-package com.redstonetorch.dongbaekro.safetyFacility.entity;
-
-import java.time.LocalDateTime;
+package com.redstonetorch.dongbaekro.location.entity;
 
 import com.redstonetorch.dongbaekro.common.enums.SafetyFacilityType;
 
@@ -11,8 +9,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;

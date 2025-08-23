@@ -1,4 +1,4 @@
-package com.redstonetorch.dongbaekro.safetyFacility.repository;
+package com.redstonetorch.dongbaekro.location.repository;
 
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 
