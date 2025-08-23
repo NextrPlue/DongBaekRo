@@ -10,6 +10,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.TimeUnit
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
@@ -36,6 +37,9 @@ object AppModule {
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
             .addInterceptor(authInterceptor) // Add AuthInterceptor
+            .connectTimeout(30, TimeUnit.SECONDS) // 연결 타임아웃 30초
+            .readTimeout(60, TimeUnit.SECONDS)    // 읽기 타임아웃 60초
+            .writeTimeout(60, TimeUnit.SECONDS)   // 쓰기 타임아웃 60초
             .build()
     }
 
@@ -58,6 +62,9 @@ object AppModule {
         
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS) // 연결 타임아웃 30초
+            .readTimeout(60, TimeUnit.SECONDS)    // 읽기 타임아웃 60초
+            .writeTimeout(60, TimeUnit.SECONDS)   // 쓰기 타임아웃 60초
             .build()
             
         return Retrofit.Builder()
