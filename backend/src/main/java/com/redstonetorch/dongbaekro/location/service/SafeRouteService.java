@@ -6,9 +6,9 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.redstonetorch.dongbaekro.common.enums.SafetyFacilityType;
 import com.redstonetorch.dongbaekro.location.dto.response.KakaoWalkingDirectionsResponse;
 import com.redstonetorch.dongbaekro.location.dto.request.SafeRouteRequest;
-import com.redstonetorch.dongbaekro.location.dto.request.WalkingDirectionsRequest;
 import com.redstonetorch.dongbaekro.location.dto.request.WalkingWaypointsRequest;
 import com.redstonetorch.dongbaekro.location.dto.response.SafeRouteResponse;
 import com.redstonetorch.dongbaekro.location.dto.response.SafetyFacilityResponse;
@@ -35,7 +35,7 @@ public class SafeRouteService {
 		KakaoWalkingDirectionsResponse originalRoute = getOriginalRoute(request);
 
 		// 2. 경로 상의 안전시설 조회
-		List<SafetyFacility> nearbyFacilities = findNearbyFacilities(originalRoute);
+		List<SafetyFacility> nearbyFacilities = findNearbyFacilities(originalRoute, request);
 
 		// 3. 적절한 경유지 선택
 		List<SafetyFacility> selectedWaypoints = selectOptimalWaypoints(
@@ -74,7 +74,7 @@ public class SafeRouteService {
 		return response;
 	}
 
-	private List<SafetyFacility> findNearbyFacilities(KakaoWalkingDirectionsResponse route) {
+	private List<SafetyFacility> findNearbyFacilities(KakaoWalkingDirectionsResponse route, SafeRouteRequest request) {
 		List<SafetyFacility> allFacilities = new ArrayList<>();
 
 		if (route.routes() == null || route.routes().isEmpty()) {
@@ -99,9 +99,10 @@ public class SafeRouteService {
 							List<SafetyFacility> facilities = safetyFacilityRepository
 								.findFacilitiesWithinRadius(latitude, longitude, SEARCH_RADIUS_METERS);
 
-							// 중복 제거를 위해 ID 기반으로 체크
+							// 중복 제거를 위해 ID 기반으로 체크하고, 선호 시설 타입으로 필터링
 							for (SafetyFacility facility : facilities) {
-								if (allFacilities.stream().noneMatch(f -> f.getId().equals(facility.getId()))) {
+								if (allFacilities.stream().noneMatch(f -> f.getId().equals(facility.getId())) &&
+									isPreferredFacilityType(facility, request.preferredFacilityTypes())) {
 									allFacilities.add(facility);
 								}
 							}
@@ -111,7 +112,8 @@ public class SafeRouteService {
 			}
 		}
 
-		log.info("Found {} safety facilities within {}m of the route", allFacilities.size(), SEARCH_RADIUS_METERS);
+		log.info("Found {} safety facilities within {}m of the route matching preferred types", allFacilities.size(),
+			SEARCH_RADIUS_METERS);
 		return allFacilities;
 	}
 
@@ -301,5 +303,14 @@ public class SafeRouteService {
 		}
 
 		return new SafeRouteResponse(originalRoute, waypointResponses, safeRoute, comparison);
+	}
+
+	private boolean isPreferredFacilityType(SafetyFacility facility, List<SafetyFacilityType> preferredTypes) {
+		// 선호 타입이 지정되지 않았다면 모든 시설 허용
+		if (preferredTypes == null || preferredTypes.isEmpty()) {
+			return true;
+		}
+		// 시설이 선호 타입 목록에 포함되는지 확인
+		return preferredTypes.contains(facility.getType());
 	}
 }
