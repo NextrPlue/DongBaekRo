@@ -50,7 +50,9 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onNavigateToRouteSelection: (Double, Double, KakaoPlace) -> Unit = { _, _, _ -> }
+) {
     val context = LocalContext.current
     val viewModel: NeighborhoodViewModel = hiltViewModel()
     val searchViewModel: SearchViewModel = hiltViewModel()
@@ -105,12 +107,16 @@ fun HomeScreen() {
             map.labelManager?.layer?.removeAll()
             currentLat?.let { lat -> currentLng?.let { lng -> setupUserLocationMarker(map, lat, lng) } }
 
+            // Add selected destination marker if available
+            selectedDestination?.let { destination ->
+                addDestinationMarker(map, destination)
+            }
+
             // Add new labels for safety facilities
             safetyFacilities.forEach { facility ->
                 val pos = LatLng.from(facility.latitude, facility.longitude)
                 val labelOptions = LabelOptions.from(pos)
                     .setStyles(getMarkerStyleForType(facility.type))
-                    .setTexts(LabelTextBuilder().setTexts(facility.name))
 
                 map.labelManager?.layer?.addLabel(labelOptions)
             }
@@ -119,6 +125,27 @@ fun HomeScreen() {
             safetyFacilities.firstOrNull()?.let { firstFacility ->
                 val firstFacilityPos = LatLng.from(firstFacility.latitude, firstFacility.longitude)
                 map.moveCamera(CameraUpdateFactory.newCenterPosition(firstFacilityPos, 15))
+            }
+        }
+    }
+    
+    // Observe selected destination and update map
+    LaunchedEffect(selectedDestination) {
+        selectedDestination?.let { destination ->
+            kakaoMap.value?.let { map ->
+                // Clear existing markers
+                map.labelManager?.layer?.removeAll()
+                
+                // Add user location marker
+                currentLat?.let { lat -> 
+                    currentLng?.let { lng -> 
+                        setupUserLocationMarker(map, lat, lng) 
+                    } 
+                }
+                
+                // Add destination marker and move camera
+                addDestinationMarker(map, destination)
+                moveToDestination(map, destination)
             }
         }
     }
@@ -249,6 +276,19 @@ fun HomeScreen() {
                 onSearchSubmit = { query ->
                     searchViewModel.searchPlaces(query, currentLat, currentLng)
                 },
+                onPlaceSelected = { place ->
+                    selectedDestination = place
+                    searchText = place.place_name
+                    isSearchActive = false
+                    keyboardController?.hide()
+                    
+                    // 경로 선택 화면으로 네비게이션
+                    currentLat?.let { lat ->
+                        currentLng?.let { lng ->
+                            onNavigateToRouteSelection(lat, lng, place)
+                        }
+                    }
+                },
                 focusRequester = focusRequester,
                 currentLat = currentLat,
                 currentLng = currentLng,
@@ -329,6 +369,7 @@ fun SearchOverlay(
     onSearchTextChange: (String) -> Unit,
     onSearchClose: () -> Unit,
     onSearchSubmit: (String) -> Unit,
+    onPlaceSelected: (KakaoPlace) -> Unit,
     focusRequester: FocusRequester,
     currentLat: Double?,
     currentLng: Double?,
@@ -568,8 +609,7 @@ fun SearchOverlay(
                         SearchResultItem(
                             place = place,
                             onClick = { selectedPlace ->
-                                // TODO: 선택된 장소로 목적지 설정
-                                onSearchTextChange(selectedPlace.place_name)
+                                onPlaceSelected(selectedPlace)
                                 searchViewModel.clearResults()
                             }
                         )
@@ -1049,9 +1089,38 @@ fun moveToMyLocation(map: KakaoMap?, lat: Double, lng: Double) {
     }
 }
 
+// 목적지 마커 추가 함수
+fun addDestinationMarker(map: KakaoMap, destination: KakaoPlace) {
+    try {
+        val labelManager = map.labelManager ?: return
+        val destinationLatLng = LatLng.from(destination.y.toDouble(), destination.x.toDouble())
+        
+        val destinationStyles = com.kakao.vectormap.label.LabelStyles.from(
+            com.kakao.vectormap.label.LabelStyle.from(android.R.drawable.ic_notification_overlay)
+        )
+        
+        val destinationOptions = LabelOptions.from(destinationLatLng)
+            .setStyles(destinationStyles)
+        
+        labelManager.layer?.addLabel(destinationOptions)
+    } catch (e: Exception) {
+        android.util.Log.e("HomeScreen", "Error adding destination marker", e)
+    }
+}
+
+// 목적지로 카메라 이동 함수
+fun moveToDestination(map: KakaoMap, destination: KakaoPlace) {
+    try {
+        val destinationLatLng = LatLng.from(destination.y.toDouble(), destination.x.toDouble())
+        map.moveCamera(CameraUpdateFactory.newCenterPosition(destinationLatLng, 15))
+    } catch (e: Exception) {
+        android.util.Log.e("HomeScreen", "Error moving camera to destination", e)
+    }
+}
+
 // Helper function to get marker style based on facility type
-fun getMarkerStyleForType(type: String): Int {
-    return when (type) {
+fun getMarkerStyleForType(type: String): com.kakao.vectormap.label.LabelStyles {
+    val iconRes = when (type) {
         "CCTV" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
         "STREETLAMP" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
         "POLICE_SUBSTATION" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
@@ -1060,5 +1129,8 @@ fun getMarkerStyleForType(type: String): Int {
         "SAFE_DELIVERY_BOX" -> android.R.drawable.ic_menu_mylocation // More visible placeholder
         else -> android.R.drawable.ic_menu_mylocation // Default marker
     }
+    return com.kakao.vectormap.label.LabelStyles.from(
+        com.kakao.vectormap.label.LabelStyle.from(iconRes)
+    )
 }
 

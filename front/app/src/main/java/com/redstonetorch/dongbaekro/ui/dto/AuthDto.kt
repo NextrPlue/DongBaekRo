@@ -85,18 +85,39 @@ data class SafeRouteResponse(
 )
 
 data class SafeRouteData(
-    val safeRoute: SafeRoute,
+    val originalRoute: KakaoRoute,
+    val safeRoute: KakaoRoute,
     val selectedWaypoints: List<SelectedWaypoint>,
-    val comparison: Comparison
+    val comparison: RouteComparison
 )
 
-data class SafeRoute(
-    val vertexes: List<Vertex> // List of LatLng pairs
+data class KakaoRoute(
+    val trans_id: String,
+    val routes: List<RouteInfo>
 )
 
-data class Vertex(
-    val latitude: Double,
-    val longitude: Double
+data class RouteInfo(
+    val result_code: Int,
+    val result_message: String,
+    val summary: RouteSummary,
+    val sections: List<RouteSection>
+)
+
+data class RouteSummary(
+    val distance: Int,
+    val duration: Int
+)
+
+data class RouteSection(
+    val distance: Int,
+    val duration: Int,
+    val roads: List<Road>
+)
+
+data class Road(
+    val distance: Int,
+    val duration: Int,
+    val vertexes: List<Double> // [lng, lat, lng, lat, ...]
 )
 
 data class SelectedWaypoint(
@@ -112,8 +133,12 @@ data class SelectedWaypoint(
     val code: String
 )
 
-data class Comparison(
-    val duration: Int, // in seconds
-    val distance: Int, // in meters
-    val waypointCount: Int
+data class RouteComparison(
+    val originalDistance: Int,
+    val safeDistance: Int,
+    val originalDuration: Int,
+    val safeDuration: Int,
+    val additionalDistance: Int,
+    val additionalDuration: Int,
+    val safetyFacilitiesCount: Int
 )
