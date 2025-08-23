@@ -44,23 +44,6 @@ public class SafetyFacility {
 	@Column(nullable = false)
 	private String address;
 
-	@Column(nullable = false)
-	private LocalDateTime createdAt;
-
-	@Column(nullable = false)
-	private LocalDateTime updatedAt;
-
-	@PrePersist
-	protected void onCreate() {
-		createdAt = LocalDateTime.now();
-		updatedAt = LocalDateTime.now();
-	}
-
-	@PreUpdate
-	protected void onUpdate() {
-		updatedAt = LocalDateTime.now();
-	}
-
 	@Builder
 	public SafetyFacility(SafetyFacilityType type, String name, Double latitude, Double longitude, String address) {
 		this.type = type;
