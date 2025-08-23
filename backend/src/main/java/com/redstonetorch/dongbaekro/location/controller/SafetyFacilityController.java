@@ -32,8 +32,16 @@ public class SafetyFacilityController {
 
 	@GetMapping("/by-code")
 	public ResponseEntity<ApiResponse<List<SafetyFacilityResponse>>> getSafetyFacilitiesByCode(
-		@RequestParam String code) {
-		List<SafetyFacilityResponse> facilities = safetyFacilityService.findByCode(code);
+		@RequestParam String code,
+		@RequestParam(required = false) SafetyFacilityType type) {
+		List<SafetyFacilityResponse> facilities;
+
+		if (type != null) {
+			facilities = safetyFacilityService.findByCodeAndType(code, type);
+		} else {
+			facilities = safetyFacilityService.findByCode(code);
+		}
+
 		return ResponseEntity.ok(ApiResponse.success(facilities));
 	}
 
