@@ -66,3 +66,54 @@ data class SafetyFacility(
     val region3DepthName: String,
     val code: String
 )
+
+// Request DTO for safe route API
+data class RouteRequest(
+    val originLatitude: Double,
+    val originLongitude: Double,
+    val destinationLatitude: Double,
+    val destinationLongitude: Double,
+    val preferredFacilityTypes: List<String>
+)
+
+// Response DTO for safe route API
+data class SafeRouteResponse(
+    val status: String,
+    val message: String,
+    val data: SafeRouteData,
+    val timestamp: String
+)
+
+data class SafeRouteData(
+    val safeRoute: SafeRoute,
+    val selectedWaypoints: List<SelectedWaypoint>,
+    val comparison: Comparison
+)
+
+data class SafeRoute(
+    val vertexes: List<Vertex> // List of LatLng pairs
+)
+
+data class Vertex(
+    val latitude: Double,
+    val longitude: Double
+)
+
+data class SelectedWaypoint(
+    val id: Int,
+    val type: String,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val addressName: String,
+    val region1DepthName: String,
+    val region2DepthName: String,
+    val region3DepthName: String,
+    val code: String
+)
+
+data class Comparison(
+    val duration: Int, // in seconds
+    val distance: Int, // in meters
+    val waypointCount: Int
+)

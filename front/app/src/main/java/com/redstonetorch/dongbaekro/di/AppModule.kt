@@ -2,6 +2,7 @@ package com.redstonetorch.dongbaekro.di // di(dependency injection) 패키지를
 
 import com.redstonetorch.dongbaekro.ui.AuthApiService
 import com.redstonetorch.dongbaekro.ui.SafetyApiService // New import
+import com.redstonetorch.dongbaekro.ui.RouteApiService // New import
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -56,5 +57,11 @@ object AppModule {
     @Provides
     fun provideSafetyApiService(retrofit: Retrofit): SafetyApiService { // New provide method
         return retrofit.create(SafetyApiService::class.java)
+    }
+
+    @Singleton
+    @Provides
+    fun provideRouteApiService(retrofit: Retrofit): RouteApiService { // New provide method
+        return retrofit.create(RouteApiService::class.java)
     }
 }
