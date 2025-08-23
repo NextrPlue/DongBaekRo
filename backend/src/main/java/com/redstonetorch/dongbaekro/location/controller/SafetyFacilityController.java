@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.redstonetorch.dongbaekro.common.dto.response.ApiResponse;
 import com.redstonetorch.dongbaekro.location.dto.response.SafetyFacilityResponse;
+import com.redstonetorch.dongbaekro.location.service.KakaoLocationService;
 import com.redstonetorch.dongbaekro.location.service.SafetyFacilityService;
 
 import lombok.RequiredArgsConstructor;
@@ -20,11 +21,20 @@ import lombok.RequiredArgsConstructor;
 public class SafetyFacilityController {
 
 	private final SafetyFacilityService safetyFacilityService;
+	private final KakaoLocationService kakaoLocationService;
 
 	@GetMapping("/by-code")
 	public ResponseEntity<ApiResponse<List<SafetyFacilityResponse>>> getSafetyFacilitiesByCode(
 		@RequestParam String code) {
 		List<SafetyFacilityResponse> facilities = safetyFacilityService.findByCode(code);
 		return ResponseEntity.ok(ApiResponse.success(facilities));
+	}
+
+	@GetMapping("/region-code")
+	public ResponseEntity<ApiResponse<String>> getRegionCodeFromCoordinates(
+		@RequestParam double latitude,
+		@RequestParam double longitude) {
+		String regionCode = kakaoLocationService.getRegionCodeFromCoordinates(longitude, latitude);
+		return ResponseEntity.ok(ApiResponse.success(regionCode));
 	}
 }
