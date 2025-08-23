@@ -1,0 +1,269 @@
+package com.redstonetorch.dongbaekro.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.kakao.vectormap.KakaoMap
+import com.kakao.vectormap.MapLifeCycleCallback
+import com.kakao.vectormap.LatLng
+import com.kakao.vectormap.MapView
+import com.kakao.vectormap.label.LabelOptions
+import com.kakao.vectormap.label.LabelStyle
+import com.kakao.vectormap.label.LabelStyles
+import com.kakao.vectormap.route.RouteLineOptions
+import com.kakao.vectormap.route.RouteLineStyle
+import com.kakao.vectormap.route.RouteLineStyles
+import com.redstonetorch.dongbaekro.ui.dto.Road
+import com.redstonetorch.dongbaekro.ui.dto.Route
+import com.redstonetorch.dongbaekro.ui.dto.Waypoint
+
+@Composable
+fun RouteSelectionScreen(
+    viewModel: RouteViewModel = hiltViewModel(),
+    // 이전 화면에서 출발지, 목적지, 선호 타입을 전달받아야 함
+    origin: LatLng,
+    destination: LatLng,
+    preferredTypes: List<String>
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val kakaoMap = remember { mutableStateOf<KakaoMap?>(null) }
+
+    // 화면이 처음 그려질 때 경로 검색 API 호출
+    LaunchedEffect(Unit) {
+        viewModel.searchSafeRoute(
+            origin.latitude, origin.longitude,
+            destination.latitude, destination.longitude,
+            preferredTypes
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 카카오맵 뷰
+        AndroidView(
+            factory = { context ->
+                MapView(context).apply {
+                    start(object : MapLifeCycleCallback() {
+                        override fun onMapReady(kakaoMap: KakaoMap) {
+                            // 지도가 준비되었을 때 호출
+                            kakaoMap.value = kakaoMap
+                        }
+
+                        override fun onMapDestroy() {
+                            // 지도가 소멸될 때 호출
+                        }
+
+                        override fun onMapError(exception: Exception?) {
+                            // 지도 에러 발생 시 호출
+                        }
+                    })
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        when (val state = uiState) {
+            is RouteUiState.Loading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            is RouteUiState.Success -> {
+                // 경로 데이터가 성공적으로 로드되면 지도에 그리기
+                LaunchedEffect(state.routeData) {
+                    kakaoMap.value?.let { map ->
+                        // 기존 그림들 모두 삭제
+                        map.routeLineManager?.layer?.clearAll()
+                        map.labelManager?.layer?.clearAll()
+
+                        // 안심 경로선과 경유지 마커만 그리기
+                        drawRoutePolyline(map, state.routeData.safeRoute, Color(0xFF3689FF)) // 파란색
+                        drawWaypoints(map, state.routeData.selectedWaypoints)
+
+                        // 출발지와 목적지 핀 찍기
+                        drawStartEndPoints(map, origin, destination)
+                    }
+                }
+
+                // 화면 하단 정보 UI
+                SafeRouteInfoPanel(
+                    routeData = state.routeData,
+                    onStartClick = { /* TODO: 안내 시작 로직 */ }
+                )
+            }
+            is RouteUiState.Error -> {
+                Text(
+                    text = state.message,
+                    modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                    color = Color.Red
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 화면 하단에 표시될 '안심 경로' 정보 패널
+ */
+@Composable
+fun BoxScope.SafeRouteInfoPanel(
+    routeData: com.redstonetorch.dongbaekro.ui.dto.RouteResultData,
+    onStartClick: () -> Unit
+) {
+    // 안심 경로의 요약 정보 추출
+    val safeRouteSummary = routeData.safeRoute.routes.firstOrNull()?.summary
+    val minutes = safeRouteSummary?.duration?.div(60) ?: 0
+    val distanceKm = String.format("%.1fkm", (safeRouteSummary?.distance ?: 0) / 1000.0)
+    val facilitiesCount = routeData.comparison.safetyFacilitiesCount
+
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .background(Color.White, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .padding(16.dp)
+    ) {
+        Text("최근에 탐색한 경로", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            "약 ${minutes}분 소요 • ${distanceKm}",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 안전시설물 정보 표시
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // CCTV 정보
+            Row {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Videocam,
+                    contentDescription = "CCTV",
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(" CCTV 15개", fontSize = 12.sp, color = Color(0xFF666666))
+            }
+
+            // 가로등 정보
+            Row {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.LightMode,
+                    contentDescription = "가로등",
+                    tint = Color(0xFFFFC107),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(" 가로등 충분", fontSize = 12.sp, color = Color(0xFF666666))
+            }
+
+            // 인내반 정보
+            Row {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Groups,
+                    contentDescription = "안내반",
+                    tint = Color(0xFF2196F3),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(" 안내반 있음", fontSize = 12.sp, color = Color(0xFF666666))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 안내 시작 버튼
+        Button(
+            onClick = onStartClick,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3689FF))
+        ) {
+            Text("시작", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+// 지도에 경로선을 그리는 함수
+private fun drawRoutePolyline(map: KakaoMap, route: Route, color: Color) {
+    val routeLineManager = map.routeLineManager ?: return
+
+    val style = RouteLineStyles.from(RouteLineStyle.from(8.dp, color))
+
+    val latLngList = route.routes.flatMap { it.sections }.flatMap { it.roads }.flatMap { road ->
+        parseVertices(road)
+    }
+
+    if (latLngList.isNotEmpty()) {
+        val options = RouteLineOptions.from(latLngList).setStyles(style)
+        routeLineManager.layer.add(options)
+    }
+}
+
+// 지도에 안전시설물 마커를 찍는 함수
+private fun drawWaypoints(map: KakaoMap, waypoints: List<Waypoint>) {
+    val labelManager = map.labelManager ?: return
+
+    waypoints.forEach { waypoint ->
+        try {
+            // 안전시설물 타입에 따라 다른 아이콘 사용
+            val iconResource = when (waypoint.type) {
+                "CCTV" -> android.R.drawable.ic_menu_camera
+                "streetlight" -> android.R.drawable.ic_menu_day
+                "patrol" -> android.R.drawable.ic_menu_mylocation
+                else -> android.R.drawable.ic_dialog_map
+            }
+
+            val styles = LabelStyles.from(LabelStyle.from(iconResource))
+            val options = LabelOptions.from(LatLng.from(waypoint.latitude, waypoint.longitude)).setStyles(styles)
+            labelManager.layer.add(options)
+        } catch (e: Exception) {
+            // 마커 추가 실패 시 로그만 남기고 계속 진행
+            e.printStackTrace()
+        }
+    }
+}
+
+// 출발지와 목적지 마커를 그리는 함수
+private fun drawStartEndPoints(map: KakaoMap, origin: LatLng, destination: LatLng) {
+    val labelManager = map.labelManager ?: return
+
+    try {
+        // 출발지 마커 (초록색)
+        val startStyles = LabelStyles.from(LabelStyle.from(android.R.drawable.ic_media_play))
+        val startOptions = LabelOptions.from(origin).setStyles(startStyles)
+        labelManager.layer.add(startOptions)
+
+        // 목적지 마커 (빨간색)
+        val endStyles = LabelStyles.from(LabelStyle.from(android.R.drawable.ic_menu_mylocation))
+        val endOptions = LabelOptions.from(destination).setStyles(endStyles)
+        labelManager.layer.add(endOptions)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+// [lng, lat, lng, lat, ...] 형태의 리스트를 LatLng 리스트로 변환
+private fun parseVertices(road: Road): List<LatLng> {
+    return try {
+        road.vertexes.chunked(2).mapNotNull { chunk ->
+            if (chunk.size == 2) {
+                val (lng, lat) = chunk
+                LatLng.from(lat, lng)
+            } else null
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyList()
+    }
+}
