@@ -30,7 +30,10 @@ public enum ErrorCode {
 	AUTH_CURRENT_PASSWORD_MISMATCH("AUTH_1007", "현재 비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST),
 
 	// Auth - Not Found (404)
-	AUTH_USER_NOT_FOUND("AUTH_1008", "해당하는 사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+	AUTH_USER_NOT_FOUND("AUTH_1008", "해당하는 사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+
+	// Emergency Report - Not Found (404)
+	EMERGENCY_REPORT_NOT_FOUND("EMERGENCY_2001", "해당하는 긴급 신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
 
 	private final String code;
 	private final String message;
