@@ -84,12 +84,14 @@ public class SafetyFacilityController {
 		@RequestParam double originLatitude,
 		@RequestParam double originLongitude,
 		@RequestParam double destinationLatitude,
-		@RequestParam double destinationLongitude) {
+		@RequestParam double destinationLongitude,
+		@RequestParam(required = false) List<SafetyFacilityType> preferredFacilityTypes) {
 
 		try {
 			SafeRouteRequest request = new SafeRouteRequest(
 				originLatitude, originLongitude,
-				destinationLatitude, destinationLongitude
+				destinationLatitude, destinationLongitude,
+				preferredFacilityTypes
 			);
 
 			SafeRouteResponse safeRoute = safeRouteService.generateSafeRoute(request);
