@@ -17,10 +17,13 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        val kakaoRestKey = project.findProperty("KAKAO_REST_KEY") as String? ?: ""
-        val kakaoNativeKey = project.findProperty("KAKAO_NATIVE_KEY") as String? ?: ""
+        val kakaoRestKey = project.findProperty("KAKAO_REST_KEY") as String? ?: "3f64ed6fe279a3283fde2430006a681f"
+        val kakaoNativeKey = project.findProperty("KAKAO_NATIVE_KEY") as String? ?: "d17493f40fc2b80fc57cb03e3abdddec"
+        
+        println("DEBUG: KAKAO_REST_KEY = '$kakaoRestKey'")
+        println("DEBUG: KAKAO_NATIVE_KEY = '$kakaoNativeKey'")
 
-        manifestPlaceholders["KAKAO_NATIVE_KEY"] = project.findProperty("KAKAO_NATIVE_KEY") ?: ""
+        manifestPlaceholders["KAKAO_NATIVE_KEY"] = kakaoNativeKey
 
 
         buildConfigField("String", "KAKAO_REST_KEY", "\"$kakaoRestKey\"")

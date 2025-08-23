@@ -40,6 +40,8 @@ import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelTextBuilder
 import com.redstonetorch.dongbaekro.R
 import com.redstonetorch.dongbaekro.ui.NeighborhoodViewModel
+import com.redstonetorch.dongbaekro.ui.SearchViewModel
+import com.redstonetorch.dongbaekro.ui.dto.KakaoPlace
 import com.redstonetorch.dongbaekro.util.CommonUtils
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +53,10 @@ import java.util.Locale
 fun HomeScreen() {
     val context = LocalContext.current
     val viewModel: NeighborhoodViewModel = hiltViewModel()
+    val searchViewModel: SearchViewModel = hiltViewModel()
+    
+    // 선택된 장소 상태
+    var selectedDestination by remember { mutableStateOf<KakaoPlace?>(null) }
 
     val locationPermissionState = rememberPermissionState(
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -241,13 +247,12 @@ fun HomeScreen() {
                     keyboardController?.hide()
                 },
                 onSearchSubmit = { query ->
-                    println("검색어: $query")
-                    isSearchActive = false
-                    keyboardController?.hide()
+                    searchViewModel.searchPlaces(query, currentLat, currentLng)
                 },
                 focusRequester = focusRequester,
                 currentLat = currentLat,
-                currentLng = currentLng
+                currentLng = currentLng,
+                searchViewModel = searchViewModel
             )
         }
     }
@@ -326,11 +331,17 @@ fun SearchOverlay(
     onSearchSubmit: (String) -> Unit,
     focusRequester: FocusRequester,
     currentLat: Double?,
-    currentLng: Double?
+    currentLng: Double?,
+    searchViewModel: SearchViewModel
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var startLocation by remember { mutableStateOf("내 위치") }
+    
+    // 검색 결과 상태
+    val searchResults by searchViewModel.searchResults.collectAsState()
+    val isLoading by searchViewModel.isLoading.collectAsState()
+    val searchError by searchViewModel.error.collectAsState()
 
     // 실제 위치를 주소로 변환
     LaunchedEffect(currentLat, currentLng) {
@@ -489,6 +500,15 @@ fun SearchOverlay(
                                 }
                             }
                         ),
+                        trailingIcon = {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(0xFF6B7280)
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = Color.Transparent,
@@ -515,38 +535,90 @@ fun SearchOverlay(
             }
 
 
-            // 검색 제안 목록
+            // 검색 결과 목록
             Column {
-                // 카테고리별 검색 제안
-                SearchCategory(
-                    icon = R.drawable.location_on,
-                    title = "조개토굴이"
-                )
-                SearchCategory(
-                    icon = R.drawable.outline_search_24,
-                    title = "조개구이"
-                )
-                SearchCategory(
-                    icon = R.drawable.location_on,
-                    title = "투인사브 산동점"
-                )
-                SearchCategory(
-                    icon = R.drawable.location_on,
-                    title = "공자 구리구평점"
-                )
-                SearchCategory(
-                    icon = R.drawable.outline_search_24,
-                    title = "전평동(서한아파트발만)",
-                    subtitle = "10777"
-                )
-                SearchCategory(
-                    icon = R.drawable.outline_search_24,
-                    title = "공자"
-                )
+                // 에러 메시지 표시
+                searchError?.let { error ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2))
+                    ) {
+                        Text(
+                            text = error,
+                            modifier = Modifier.padding(12.dp),
+                            color = Color(0xFFDC2626),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                
+                // 검색 결과 표시
+                if (searchResults.isNotEmpty()) {
+                    Text(
+                        text = "검색 결과",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF374151),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    searchResults.forEach { place ->
+                        SearchResultItem(
+                            place = place,
+                            onClick = { selectedPlace ->
+                                // TODO: 선택된 장소로 목적지 설정
+                                onSearchTextChange(selectedPlace.place_name)
+                                searchViewModel.clearResults()
+                            }
+                        )
+                    }
+                } else if (searchText.isEmpty()) {
+                    // 기본 추천 장소들 (검색어가 없을 때만 표시)
+                    Text(
+                        text = "추천 장소",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF374151),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    SearchCategory(
+                        icon = R.drawable.location_on,
+                        title = "조개토굴이",
+                        onClick = { onSearchTextChange("조개토굴이") }
+                    )
+                    SearchCategory(
+                        icon = R.drawable.outline_search_24,
+                        title = "조개구이",
+                        onClick = { onSearchTextChange("조개구이") }
+                    )
+                    SearchCategory(
+                        icon = R.drawable.location_on,
+                        title = "투인사브 산동점",
+                        onClick = { onSearchTextChange("투인사브 산동점") }
+                    )
+                    SearchCategory(
+                        icon = R.drawable.location_on,
+                        title = "공자 구리구평점",
+                        onClick = { onSearchTextChange("공자 구리구평점") }
+                    )
+                }
             }
         }
     }
 
+    // 검색어 변경 시 자동 검색 (디바운싱)
+    LaunchedEffect(searchText) {
+        if (searchText.isNotEmpty()) {
+            kotlinx.coroutines.delay(300) // 300ms 디바운싱
+            searchViewModel.searchPlaces(searchText, currentLat, currentLng)
+        } else {
+            searchViewModel.clearResults()
+        }
+    }
+    
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
@@ -620,16 +692,71 @@ fun CategoryButton(
 }
 
 @Composable
-fun SearchCategory(
-    icon: Int,
-    title: String,
-    subtitle: String? = null
+fun SearchResultItem(
+    place: KakaoPlace,
+    onClick: (KakaoPlace) -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* TODO: 검색 결과 선택 */ }
+            .clickable { onClick(place) }
+            .padding(vertical = 12.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.location_on),
+            contentDescription = "장소",
+            tint = Color(0xFF3B82F6),
+            modifier = Modifier.size(24.dp)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = place.place_name,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF374151)
+            )
+            Text(
+                text = place.road_address_name.ifEmpty { place.address_name },
+                fontSize = 12.sp,
+                color = Color(0xFF6B7280),
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            if (place.category_group_name.isNotEmpty()) {
+                Text(
+                    text = place.category_group_name,
+                    fontSize = 10.sp,
+                    color = Color(0xFF9CA3AF),
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+            }
+        }
+
+        if (place.distance.isNotEmpty()) {
+            Text(
+                text = "${(place.distance.toIntOrNull() ?: 0)}m",
+                fontSize = 10.sp,
+                color = Color(0xFF6B7280)
+            )
+        }
+    }
+}
+
+@Composable
+fun SearchCategory(
+    icon: Int,
+    title: String,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick?.invoke() }
             .padding(vertical = 8.dp)
     ) {
         Icon(

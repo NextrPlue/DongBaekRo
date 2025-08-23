@@ -3,6 +3,7 @@ package com.redstonetorch.dongbaekro.di // di(dependency injection) 패키지를
 import com.redstonetorch.dongbaekro.ui.AuthApiService
 import com.redstonetorch.dongbaekro.ui.SafetyApiService // New import
 import com.redstonetorch.dongbaekro.ui.RouteApiService // New import
+import com.redstonetorch.dongbaekro.ui.KakaoSearchApiService // New import
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,6 +13,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
+import javax.inject.Named
 import com.redstonetorch.dongbaekro.util.TokenManager // New import
 
 @Module
@@ -49,6 +51,24 @@ object AppModule {
 
     @Singleton
     @Provides
+    @Named("kakao")
+    fun provideKakaoRetrofit(): Retrofit {
+        val loggingInterceptor = HttpLoggingInterceptor()
+        loggingInterceptor.level = HttpLoggingInterceptor.Level.BODY
+        
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .build()
+            
+        return Retrofit.Builder()
+            .baseUrl("https://dapi.kakao.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Singleton
+    @Provides
     fun provideAuthApiService(retrofit: Retrofit): AuthApiService {
         return retrofit.create(AuthApiService::class.java)
     }
@@ -63,5 +83,11 @@ object AppModule {
     @Provides
     fun provideRouteApiService(retrofit: Retrofit): RouteApiService { // New provide method
         return retrofit.create(RouteApiService::class.java)
+    }
+
+    @Singleton
+    @Provides
+    fun provideKakaoSearchApiService(@Named("kakao") retrofit: Retrofit): KakaoSearchApiService {
+        return retrofit.create(KakaoSearchApiService::class.java)
     }
 }
